@@ -1,4 +1,7 @@
 2026.05.11:
+* new: scripts/git_log.sh: script to print git commit messages with normalized ends
+
+2026.05.11:
 * new: scripts/git_status.sh: script to find all git working copies starting a directory and call `git status` in it
 * changed: scripts/vcstool/git_gen_gitmodules.sh: update default value for `--exclude-dirs` option, added built in `DEFAULT_EXCLUDE_DIRS` variable to use as a default value
 
