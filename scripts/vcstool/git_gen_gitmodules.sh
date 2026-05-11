@@ -21,8 +21,10 @@
 #   --exclude-dirs <dirs-list>:
 #     List of directories to exclude from the search, where `<dirs-list>`
 #     is a string evaluatable to the shell array.
-#     If not defined, then `".git" ".log" "_externals" "_out"` is used by
-#     default.
+#
+#     If not defined, then this list is used as `DEFAULT_EXCLUDE_DIRS`
+#     variable:
+#       `".git" ".log" ".temp" "_externals" "_out" "*.backup" "*.bak"`
 #
 #   -u
 #   --gen-submodule-name-from-url
@@ -112,6 +114,10 @@
 #   git_gen_gitmodules.sh -fatu
 #   >
 #   find . -name .gitmodules -type f
+#
+#   >
+#   cd myrepo/path
+#   git_gen_gitmodules.sh --exclude-dirs '$DEFAULT_EXCLUDE_DIRS "*.suffix"' . '.repos*'
 #
 
 # Script both for execution and inclusion.
@@ -305,8 +311,10 @@ function git_gen_gitmodules()
     default_input_file_name_prefix='.externals'
   fi
 
+  local DEFAULT_EXCLUDE_DIRS='".git" ".log" ".temp" "_externals" "_out" "*.backup" "*.bak"'
+
   if [[ -z "$exclude_dirs" ]]; then
-    exclude_dirs='".git" ".log" "_externals" "_out"'
+    exclude_dirs='$DEFAULT_EXCLUDE_DIRS'
   fi
 
   local dir="${1:-.}"
