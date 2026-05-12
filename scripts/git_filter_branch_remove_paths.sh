@@ -12,16 +12,21 @@
 #   --i0
 #     Use `git update-index --index-info` to update entire index file.
 #     By default.
+#
 #   --i1
 #     Use `git update-index --remove` instead.
+#
 #   --i2
 #     Use `git rm --cached` instead.
+#
 #   -f
 #     Use `git rm -f` or `git update-index --force-remove` respectively
 #     instead. Is not applicable for the `--i0`.
+#
 #   -r
 #     Use `git rm -r` respectively instead. Is not applicable for the `--i0`
 #     and `--i1`.
+#
 #   -m
 #   --remove-submodules
 #     Remove submodule paths using `.gitmodules` file and the skip
@@ -33,11 +38,13 @@
 #       The command line path list does remove unconditionally and so does
 #       not affect the paths in the `.gitmodules` leaving them unchanged.
 #       You must use this flag to reflect the changes into the file.
+#
 #   -P
 #   --skip-submodule-path-prefix
 #     Skip submodule remove for path with prefix (no globbing).
 #     Has no effect if `--remove-submodules` flag is not used.
 #     Has no effect if `.gitmodules` is in path list.
+#
 #   -i
 #   --sync-gitignore-submodule-paths
 #     Synchronize `.gitignore` for paths removed from `.gitmodules`.
@@ -54,6 +61,7 @@
 #       The command line path list does remove unconditionally and so does
 #       not affect the paths in the `.gitignore` leaving them unchanged.
 #       You must use this flag to reflect the changes into the file.
+#
 #   -p
 #   --prune-empty
 #     Generate replace references to prune the empty commits after they
@@ -75,6 +83,7 @@
 #       `git filter-branch --prune-empty` command with at least the same
 #       (or may be with the modificated one to select the rewrited range)
 #       commits filter range expression manually after the script.
+#
 #   -z
 #   --finalize
 #     Finalizes changes and applies replace references just after the replace

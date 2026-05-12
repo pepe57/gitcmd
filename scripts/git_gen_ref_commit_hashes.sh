@@ -11,6 +11,7 @@
 # <flags>:
 #   -c
 #     Print only commits with not equal hashes.
+#
 #   -p
 #     Include print parents for each commit.
 

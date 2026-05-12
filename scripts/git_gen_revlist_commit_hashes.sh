@@ -11,6 +11,7 @@
 # <flags>:
 #   -c
 #     Print only commits with not equal hashes.
+#
 #   -r
 #     Execute `git replace --graft <commit> <parents>` for all not equal
 #     hashes. Implies flag `-c`.

@@ -8,7 +8,7 @@
 #   Before the push all branches does the current branch pull with the fast-forward merge only.
 
 # <flags>:
-#   --current-branch:
+#   --current-branch
 #     Sync a current branch only.
 
 # //:

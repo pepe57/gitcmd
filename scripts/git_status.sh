@@ -12,7 +12,7 @@
 #   -v
 #     Verbose mode.
 #
-#   --exclude-dirs <dirs-list>:
+#   --exclude-dirs <dirs-list>
 #     List of directories to exclude from the search, where `<dirs-list>`
 #     is a string evaluatable to the shell array.
 #

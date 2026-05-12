@@ -10,15 +10,15 @@
 #     https://github.com/aaronplusone/vcstool/tree/feature-sparse-checkouts
 
 # <flags>:
-#   --ignore-type:
+#   --ignore-type
 #     Ignore `type` field and generate for all repositories.
 #
-#   --default-input-file-name-prefix <default-input-file-name-prefix>:
+#   --default-input-file-name-prefix <default-input-file-name-prefix>
 #     Default input file name prefix to convert to default output file name
 #     prefix.
 #     If not defined, then `.externals` is used by default.
 #
-#   --exclude-dirs <dirs-list>:
+#   --exclude-dirs <dirs-list>
 #     List of directories to exclude from the search, where `<dirs-list>`
 #     is a string evaluatable to the shell array.
 #
@@ -41,14 +41,14 @@
 #     in the output file.
 #     This option avoids it.
 #
-#   -f:
+#   -f
 #     Force overwrite output file.
 #
-#   -a:
+#   -a
 #     Append to output file name from `<output-file-name-prefix>` as complete
 #     name (not prefix).
 #
-#   -t:
+#   -t
 #     Append next found files except the first found file (tail files).
 
 # //:

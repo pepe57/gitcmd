@@ -1,3 +1,6 @@
+2026.05.12:
+* refactor: scripts/*.sh: minor refactor
+
 2026.05.11:
 * new: scripts/git_log.sh: script to print git commit messages with normalized ends
 
