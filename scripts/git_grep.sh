@@ -1,27 +1,66 @@
 #!/usr/bin/env bash
 
 # USAGE:
-#   git_pull.sh [<flags>]  // [<dir> [<dir-name-pattern>]] // [<cmdline>]
-#   git_pull.sh [<flags>] [//] <dir> [<dir-name-pattern>]  // [<cmdline>]
+#   git_grep.sh [<flags>]  // [<dir> [<dir-name-pattern>]] // <cmdline>
+#   git_grep.sh [<flags>] [//] <dir> [<dir-name-pattern>]  // <cmdline>
 
 # Description:
-#   Script to pull repositories searched by the `find` pattern.
+#   Script to find repositories with a text pattern, searched by the `find`
+#   pattern at first and then by the `git grep <cmdline>` at second.
 
 # <flags>:
 #   -v
 #     Verbose mode.
+#     Prints worktrees list of a single worktree even if not added.
+#
+#   -n
+#   --no-print-empty
+#     Don't print empty output or with only empty lines (only line returns).
+#
+#     NOTE:
+#       The print only a not empty output does result in the output buffering,
+#       which means the result won't be printed until a command exit. So this
+#       implies disable of a line-by-line piping.
+#
+#     NOTE:
+#       You can mix `-v` and `-n`, in which case a verbose mode is used, but
+#       the commands has contained an empty output does not print.
+#
+#   -W
+#   --no-worktrees
+#     Don't traverse worktrees from a working copy.
+#     Has no effect on the `find` command, by default it skips all the
+#     directories with a `.git` file (a worktree directory does contain it).
+#
+#     NOTE:
+#       To keep look inside a worktree using the `find` command you have to
+#       explicitly use the `--no-skip-worktrees` flag.
 #
 #   -w
 #   --no-skip-worktrees
 #     Don't skip traverse a worktree directories including nested worktrees.
 #
-#     NOTE:
-#       By default the `find` command skips all the directories with a `.git`
-#       file (the worktree directory does contain it).
+#   -S
+#   --no-stashes
+#     Don't traverse stashes.
+#
+#   -T
+#   --no-untracked
+#     Don't search untracked files in a working copy.
+#     Adds `--no-untracked` flag to the <cmdline>.
 #
 #   -l
 #   --no-colors
 #     Print without colors.
+#
+#   -t
+#   --tracked-only
+#     Search tracked files only excluding everything else.
+#     Implies `--no-stashes`, `--no-untracked` flags.
+#
+#     NOTE:
+#       To exclude traverse of worktrees you have to explicitly use
+#       `--no-worktrees` flag.
 #
 #   --exclude-dirs <dirs-list>
 #     List of directories to exclude from the search, where `<dirs-list>`
@@ -55,6 +94,21 @@
 #       control characters (depends on what subsystem or Shell is used):
 #
 #         `*`, `?`, `<`, `>`, `^`, `\`, `|`, `&`, `~`, `$`, `!`, `"`, `'`, ```, ...
+#
+#   --bat-esc
+#     Enables Windows Batch compatible escapes.
+#
+#     The <cmdline> can contain an even number of double quotes prefixed by the
+#     `\` character.
+#
+#     It does replace by N/2 number of quotes without the prefix:
+#
+#       \""     -> "
+#       \""""   -> ""
+#       \"""""" -> """
+#
+#     The meaning is to always use an even number of quotes to insert an
+#     arbitrary number of quotes without an escape sequence.
 
 # //:
 #   Separator to stop parse flags.
@@ -76,14 +130,39 @@
 #     from `<cmdline>`.
 
 # <cmdline>:
-#   The rest of command line passed to `git pull` command.
+#   The rest of command line passed to `git grep` command.
+#   Must be not empty.
 
 # Examples:
 #   >
-#   git_pull.sh /home/git "*.git"
+................
+#   # Search batch file calls (.bat) with ending double quote in batch files.
+#   git_grep.sh /home/git "*.git" // -i "\.bat\"" -- "*.bat"
+#
+#   # Search batch file calls (.bat) with ending double quote in batch files,
+#   # when the <cmdline> is passed through a Windows Batch script (.bat) using
+#   # the `%*` variable.
+#   #
+#   # NOTE:
+#   #   The `\\\"\"` is a special double quote escape sequence and does
+#   #   replace by `\"`, when `'\.bat\""'` can not be used because `'` is not a
+#   #   quote character in a Windows Batch script.
+#   git_grep.sh --bat-esc /home/git "*.git" // -i "\\.bat\\\"\"" -- "*.bat"
 #
 #   >
-#   git_pull.sh --exclude-dirs '$MY_EXCLUDE_DIRS "*.suffix"'
+#   git_grep.sh --exclude-dirs '$MY_EXCLUDE_DIRS "*.suffix"' // // ...
+#
+#   >
+#   # searches tracked files only and prints not empty output
+#   git_grep.sh -tn // ...
+
+# NOTE:
+#   By default the `CR` character is treated as a white space by the Git.
+#   To avoid this you can declare the `CR` as not a white space in case of
+#   `CRLF` sequence:
+#
+#     >
+#     git config --system core.whitespace cr-at-eol
 
 # Script both for execution and inclusion.
 [[ -n "$BASH" ]] || return 0 || exit 0 # exit to avoid continue if the return can not be called
@@ -339,14 +418,19 @@ function detect_find()
   fi
 }
 
-function git_pull()
+function git_grep()
 {
   local IFS
   local flag="$1"
 
   local flag_v=0
+  local no_print_empty=0
+  local no_worktrees=0
   local no_skip_worktrees=0 # note: doesn't skip any directory with a `.git` file, not just the worktree directory only
+  local no_stashes=0
+  local no_untracked=0
   local no_colors=0
+  local tracked_only=0
   local exclude_dirs
 
   local skip_flag
@@ -356,11 +440,26 @@ function git_pull()
     skip_flag=0
 
     # long flags
-    if [[ "$flag" == '-no-skip-worktrees' ]]; then
+    if [[ "$flag" == '-no-print-empty' ]]; then
+      no_print_empty=1
+      skip_flag=1
+    elif [[ "$flag" == '-no-stashes' ]]; then
+      no_stashes=1
+      skip_flag=1
+    elif [[ "$flag" == '-no-worktrees' ]]; then
+      no_worktrees=1
+      skip_flag=1
+    elif [[ "$flag" == '-no-skip-worktrees' ]]; then
       no_skip_worktrees=1
+      skip_flag=1
+    elif [[ "$flag" == '-no-untracked' ]]; then
+      no_untracked=1
       skip_flag=1
     elif [[ "$flag" == '-no-colors' ]]; then
       no_colors=1
+      skip_flag=1
+    elif [[ "$flag" == '-tracked-only' ]]; then
+      status_only=1
       skip_flag=1
     elif [[ "$flag" == '-exclude-dirs' ]]; then
       exclude_dirs="$2"
@@ -374,10 +473,18 @@ function git_pull()
     # short flags
     if (( ! skip_flag )); then
       while [[ -n "$flag" ]]; do
-        if [[ "${flag:0:1}" == 'w' ]]; then
-          no_skip_worktrees=1
+        if [[ "${flag:0:1}" == 'n' ]]; then
+          no_print_empty=1
+        elif [[ "${flag:0:1}" == 'W' ]]; then
+          no_worktrees=1
+        elif [[ "${flag:0:1}" == 'S' ]]; then
+          no_stashes=1
+        elif [[ "${flag:0:1}" == 'T' ]]; then
+          no_untracked=1
         elif [[ "${flag:0:1}" == 'l' ]]; then
           no_colors=1
+        elif [[ "${flag:0:1}" == 't' ]]; then
+          tracked_only=1
         elif [[ "${flag:0:1}" == 'v' ]]; then
           flag_v=1
         else
@@ -411,13 +518,25 @@ function git_pull()
 
   local args=("$@")
 
+  if (( ! ${#args[@]} )) || [[ "${args[*]}" = "" ]]; then
+    echo "$0: error: cmdline is empty." >&2
+    return 255
+  fi
+
   local git_path
   local i
 
+  if (( tracked_only )); then
+    no_stashes=1
+    no_untracked=1
+  fi
+
   if (( ! no_colors )); then
     git_bare_flags=(-c color.ui=always --no-pager)
+    git_grep_bare_flags=(--color=always)
   else
     git_bare_flags=(-c color.ui=no --no-pager)
+    git_grep_bare_flags=(--color=never)
   fi
 
   if [[ -z "$dir" ]]; then
@@ -433,11 +552,6 @@ function git_pull()
 
   if [[ -z "$exclude_dirs" ]]; then
     exclude_dirs="$DEFAULT_EXCLUDE_DIRS"
-  fi
-
-  # suppress empty string to avoid error: `fatal: empty string is not a valid pathspec. please use . instead if you meant to match all paths`
-  if [[ "${args[*]}" = "" ]]; then
-    args=()
   fi
 
   dir="${dir%/.git}"
@@ -470,9 +584,89 @@ $0: info: exclude_dirs: \`$exclude_dirs\`" >&2
     find_bare_flags="$find_bare_flags -not \\( -path \"${exclude_dirs_arr[i]}\" -prune \\)"
   done
 
-  local is_record_printed=0
+  local is_buf=0
 
-  function git_pull_impl()
+  if (( no_print_empty )); then
+    is_buf=1
+  fi
+
+  local temp_buf_file="$(mktemp /tmp/temp_buf.XXXXXX)"
+
+  if (( is_buf )); then
+    local has_accum_buf=0
+    local accum_buf_file="$(mktemp /tmp/accum_buf.XXXXXX)"
+
+    : > "$accum_buf_file" # trim the buffer
+
+    function git_status_cleanup_impl()
+    {
+      rm "$accum_buf_file"
+      rm "$temp_buf_file"
+    }
+  else
+    function git_status_cleanup_impl()
+    {
+      rm "$temp_buf_file"
+    }
+  fi
+
+  trap 'git_grep_cleanup_impl; trap - RETURN' RETURN
+
+  : > "$temp_buf_file" # trim the buffer
+
+  local is_record_printed=0
+  local has_recurse_records
+  local git_worktree_list
+  local git_worktree_recurse=0
+  local git_bare_C_path=()
+
+  function has_worktrees()
+  {
+    local IFS
+    local git_worktree_path _
+    local i=0
+
+    while IFS=$' \t' read git_worktree_path _; do
+      if (( i >= 2 )); then # skip first 2 lines
+        return 0
+      fi
+      (( i++ ))
+    done < "$1"
+
+    return 1
+  }
+
+  function git_worktree_recurse_impl()
+  {
+    local IFS
+    local git_worktree_path _
+    local i=0
+
+    if (( is_buf )); then
+      if (( has_accum_buf )); then
+        #echo ===
+        echo "$(<"$accum_buf_file")"
+        has_accum_buf=0
+        is_record_printed=1
+      fi
+
+      : > "$accum_buf_file" # trim the buffer
+    fi
+
+    trap 'git_worktree_list=''; git_worktree_recurse=0; git_bare_C_path=(); trap - RETURN' RETURN
+
+    git_worktree_recurse=1
+
+    while IFS=$' \t' read git_worktree_path _; do
+      if (( i >= 2 )); then # skip first 2 lines
+        git_bare_C_path=(-C "$git_worktree_path")
+        git_grep_impl
+      fi
+      (( i++ ))
+    done <<< "$git_worktree_list"
+  }
+
+  function git_grep_impl()
   {
     local IFS=$' \t'
 
@@ -482,34 +676,110 @@ $0: info: exclude_dirs: \`$exclude_dirs\`" >&2
 
     is_record_printed=0
 
-    if (( ! no_color )); then
-      exec_auto_buf echo -en "\e[0;32m"
-    fi
+    if (( no_worktrees || ! git_worktree_recurse )); then
+      has_recurse_records=0
 
-    exec_auto_buf realpath "$git_path"
+      if (( ! no_color )); then
+        exec_auto_buf echo -en "\e[0;32m"
+      fi
 
-    if (( ! no_color )); then
-      exec_auto_buf echo -en "\e[0m"
-    fi
+      exec_auto_buf realpath "$git_path"
 
-    if (( ! is_buf )); then
-      is_record_printed=1
-    fi
+      if (( ! no_color )); then
+        exec_auto_buf echo -en "\e[0m"
+      fi
 
-    if (( flag_v )); then
-      call_auto_buf pushd "$git_path"
-    else
-      pushd "$git_path" > /dev/null
-    fi && {
-      # pull repo
-      call git ${git_bare_flags[*]} pull ${git_pull_flags[*]} "${args[@]}"
+      if (( ! is_buf )); then
+        is_record_printed=1
+      fi
 
       if (( flag_v )); then
-        call_auto_buf popd
+        call_auto_buf pushd "$git_path"
       else
-        popd > /dev/null
+        pushd "$git_path" > /dev/null
+      fi
+    else
+      if (( ! no_color )); then
+        exec_auto_buf echo -en "\e[0;36m"
+      fi
+
+      exec_auto_buf echo "$git_worktree_path (worktree)"
+
+      if (( ! no_color )); then
+        exec_auto_buf echo -en "\e[0m"
+      fi
+
+      if (( ! is_buf )); then
+        is_record_printed=1
+      fi
+
+      :
+    fi && {
+      # request, save and print worktrees
+      if (( ! no_worktrees && ! git_worktree_recurse )); then
+        if call_temp_buf git ${git_bare_flags[*]} worktree list; then
+          # CAUTION: The `if` statement must has a complete form (together with the `else`), otherwise trailing `&&` would NOT work!
+          if (( flag_v )); then
+            :
+          elif has_worktrees "$temp_buf_file"; then
+            has_recurse_records=1
+            :
+          else
+            ! : # instead of `false` call, faster
+          fi && {
+            git_worktree_list=$(<"$temp_buf_file")
+            accum_temp_buf
+            accum_buf_status
+          }
+        fi
+      fi
+
+      # print grep output
+      call_auto_buf git ${git_bare_C_path[*]} ${git_bare_flags[*]} grep "${args[@]}"
+      accum_buf_status
+
+      # print stashes
+      if (( ! no_stashes && ! git_worktree_recurse )); then
+        call_auto_buf git ${git_bare_C_path[*]} ${git_bare_flags[*]} stash list
+        accum_buf_status
+      fi
+
+      # print unmerged conflicts
+      if (( ! no_unmerged_conflicts )); then
+        call_auto_buf git ${git_bare_C_path[*]} ${git_bare_flags[*]} diff ${git_diff_bare_flags[*]} --name-only --diff-filter=U --relative
+        accum_buf_status
+      fi
+
+      # print diff checks
+      if (( ! no_diff_checks )); then
+        call_auto_buf git ${git_bare_C_path[*]} ${git_bare_flags[*]} diff ${git_diff_bare_flags[*]} --check
+        accum_buf_status
+      fi
+
+      # traverse worktrees starting from the second
+      if (( ! no_worktrees && ! git_worktree_recurse && ( flag_v || has_recurse_records ) )); then
+        git_worktree_recurse_impl
+      fi
+
+      if (( ! git_worktree_recurse )); then
+        if (( flag_v )); then
+          call_auto_buf popd
+        else
+          popd > /dev/null
+        fi
       fi
     }
+
+    if (( is_buf )); then
+      if (( has_accum_buf )); then
+        #echo ===
+        echo "$(<"$accum_buf_file")"
+        has_accum_buf=0
+        is_record_printed=1
+      fi
+
+      : > "$accum_buf_file" # trim the buffer
+    fi
   }
 
   if [[ -n "$name_pttn" ]]; then
@@ -530,11 +800,11 @@ $0: info: exclude_dirs: \`$exclude_dirs\`" >&2
 
     IFS=$'\r\n'; for git_path in `eval $eval_find_expr`; do # IFS - with trim trailing line feeds
       git_path="${git_path%/.git}"
-      git_pull_impl
+      git_grep_impl
     done
   else
     git_path="$dir"
-    git_pull_impl
+    git_grep_impl
   fi
 
   if (( is_record_printed )); then
@@ -546,5 +816,5 @@ $0: info: exclude_dirs: \`$exclude_dirs\`" >&2
 
 if [[ -z "$BASH_LINENO" || BASH_LINENO[0] -eq 0 ]]; then
   # Script was not included, then execute it.
-  git_pull "$@"
+  git_grep "$@"
 fi
