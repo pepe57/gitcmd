@@ -1,3 +1,6 @@
+2026.09.27:
+* changed: TODO.txt: todo update
+
 2026.09.22:
 * new: scripts/git_cd.*: scripts to `cd` in a working copies tree
 

@@ -5,3 +5,7 @@
 - Support skip/traverse submodules
 
 - Support traverse externals using `vcstool`, `vcs2l` or `gitman`
+
+scripts/git_status.sh:
+
+  - detect code duplication
